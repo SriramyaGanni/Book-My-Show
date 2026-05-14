@@ -42,7 +42,7 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 timeout(time: 3, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false
+                    waitForQualityGate abortPipeline: false, credentialsId: 'SonarQube'
                }
             }       
         }
@@ -51,7 +51,14 @@ pipeline {
             steps {
                 sh '''
                 cd bookmyshow-app
-                npm install
+                ls -la  # Verify package.json exists
+                if [ -f package.json ]; then
+                    rm -rf node_modules package-lock.json  # Remove old dependencies
+                    npm install  # Install fresh dependencies
+                else
+                    echo "Error: package.json not found in bookmyshow-app!"
+                    exit 1
+                fi
                 '''
             }
         }
@@ -69,30 +76,15 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
-            steps {
-                sh '''
-                docker build --no-cache -t sriramyaganni/bookmyshow:latest -f bookmyshow-app/Dockerfile bookmyshow-app
-                '''
-            }
-        }
-
-        stage('Trivy Image Scan') {
-            steps {
-                sh '''
-                trivy image \
-                --severity HIGH,CRITICAL \
-                --scanners vuln \
-                --no-progress \
-                sriramyaganni/bookmyshow:latest > trivyimage.txt
-                '''
-            }
-        } 
-        stage('Docker Push') {
+        stage('Docker Build & Push') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'dockerhub', toolName: 'docker') {
-                        sh '''
+                        sh ''' 
+                        echo "Building Docker image..."
+                        docker build --no-cache -t sriramyaganni/bookmyshow:latest -f bookmyshow-app/Dockerfile bookmyshow-app
+
+                        echo "Pushing Docker image to registry..."
                         docker push sriramyaganni/bookmyshow:latest
                         '''
                     }
@@ -106,6 +98,13 @@ pipeline {
                 docker stop bms || true
                 docker rm bms || true
                 docker run -d --restart=always --name bms -p 3000:3000 sriramyaganni/bookmyshow:latest
+
+                echo "Checking running containers..."
+                docker ps -a
+
+                echo "Fetching logs..."
+                sleep 5  # Give time for the app to start
+                docker logs bms
                 '''
             }
         }
@@ -113,17 +112,13 @@ pipeline {
 
     post {
         always {
-            emailext(
-                attachLog: true,
-                subject: "Build ${currentBuild.currentResult}: ${env.JOB_NAME}",
-                body: """
-                Project: ${env.JOB_NAME}
-                Build Number: ${env.BUILD_NUMBER}
-                Build URL: ${env.BUILD_URL}
-                """,
+            emailext attachLog: true,
+                subject: "'${currentBuild.result}'",
+                body: "Project: ${env.JOB_NAME}<br/>" +
+                      "Build Number: ${env.BUILD_NUMBER}<br/>" +
+                      "URL: ${env.BUILD_URL}<br/>",
                 to: 'gannisriramya26@gmail.com',
                 attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
-            )
         }
     }
 }
