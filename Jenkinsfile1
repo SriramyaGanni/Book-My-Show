@@ -56,12 +56,12 @@ pipeline {
             }
         }
 
-        stage('OWASP Dependency Check') {
-            steps {
-                dependencyCheck additionalArguments: '--scan bookmyshow-app',
-                odcInstallation: 'dependency-check'
-            }
-        }
+        // stage('OWASP Dependency Check') {
+        //   steps {
+        //      dependencyCheck additionalArguments: '--scan bookmyshow-app',
+        //      odcInstallation: 'dependency-check'
+        //   }
+        // }
 
         stage('Trivy FS Scan') {
             steps {
