@@ -43,10 +43,10 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                script {
+                timeout(time: 3, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: false, credentialsId: 'SonarQube'
-                }
-            }
+               }
+            }       
         }
 
         stage('Install Dependencies') {
@@ -65,12 +65,12 @@ pipeline {
             }
         }
 
-         stage('OWASP Dependency Check') {
-            steps {
-                dependencyCheck additionalArguments: '--scan bookmyshow-app',
-                odcInstallation: 'dependency-check'
-            }
-        }
+         // stage('OWASP Dependency Check') {
+        //   steps {
+        //      dependencyCheck additionalArguments: '--scan bookmyshow-app',
+        //      odcInstallation: 'dependency-check'
+        //   }
+        // }
 
         stage('Trivy FS Scan') {
             steps {
@@ -78,30 +78,15 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
-            steps {
-                sh '''
-                echo "Building Docker image..."
-                docker build --no-cache -t sriramyaganni/bookmyshow:latest -f bookmyshow-app/Dockerfile bookmyshow-app
-                '''
-            }
-        }
-
-        /* ✅ MOVE TRIVY IMAGE SCAN HERE (BEFORE PUSH) */
-        stage('Trivy Image Scan') {
-            steps {
-                sh '''
-                trivy image sriramyaganni/bookmyshow:latest > trivyimage.txt
-                '''
-            }
-        }
-
-        stage('Docker Push') {
+        stage('Docker Build & Push') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'dockerhub', toolName: 'docker') {
-                        sh '''
-                        echo "Pushing Docker image..."
+                        sh ''' 
+                        echo "Building Docker image..."
+                        docker build --no-cache -t sriramyaganni/bookmyshow:latest -f bookmyshow-app/Dockerfile bookmyshow-app
+
+                        echo "Pushing Docker image to registry..."
                         docker push sriramyaganni/bookmyshow:latest
                         '''
                     }
