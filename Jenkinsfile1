@@ -79,18 +79,15 @@ pipeline {
 
         stage('Trivy Image Scan') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') {
-                    sh '''
-                    trivy image \
-                    --scanners vuln \
-                    --no-progress \
-                    --exit-code 0 \
-                    sriramyaganni/bookmyshow:latest > trivy-image-report.txt
-                    '''
-                }
+                sh '''
+                trivy image \
+                --severity HIGH,CRITICAL \
+                --scanners vuln \
+                --no-progress \
+                sriramyaganni/bookmyshow:latest > trivyimage.txt
+                '''
             }
-        }
-
+        } 
         stage('Docker Push') {
             steps {
                 script {
