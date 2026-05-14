@@ -53,12 +53,14 @@ pipeline {
                 '''
             }
         }
+
         stage('OWASP Dependency Check') {
             steps {
                 dependencyCheck additionalArguments: '--scan bookmyshow-app',
                 odcInstallation: 'dependency-check'
             }
         }
+
         stage('Trivy FS Scan') {
             steps {
                 sh 'trivy fs . > trivyfs.txt'
@@ -68,24 +70,33 @@ pipeline {
         stage('Docker Build') {
             steps {
                 sh '''
-                echo "Building Docker image..."
-                docker build --no-cache -t sriramyaganni/bookmyshow:latest -f bookmyshow-app/Dockerfile bookmyshow-app
+                docker build --no-cache \
+                -t sriramyaganni/bookmyshow:latest \
+                -f bookmyshow-app/Dockerfile \
+                bookmyshow-app
                 '''
             }
         }
+
         stage('Trivy Image Scan') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
-                    sh 'trivy image --scanners vuln sriramyaganni/bookmyshow:latest > trivy-image-report.txt'
-                } 
+                    sh '''
+                    trivy image \
+                    --scanners vuln \
+                    --no-progress \
+                    --exit-code 0 \
+                    sriramyaganni/bookmyshow:latest > trivy-image-report.txt
+                    '''
+                }
             }
         }
+
         stage('Docker Push') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'dockerhub', toolName: 'docker') {
                         sh '''
-                        echo "Pushing Docker image..."
                         docker push sriramyaganni/bookmyshow:latest
                         '''
                     }
@@ -99,7 +110,10 @@ pipeline {
                 docker stop bms || true
                 docker rm bms || true
 
-                docker run -d --restart=always --name bms -p 3000:3000 sriramyaganni/bookmyshow:latest
+                docker run -d --restart=always \
+                --name bms \
+                -p 3000:3000 \
+                sriramyaganni/bookmyshow:latest
 
                 docker ps -a
                 sleep 5
@@ -111,13 +125,17 @@ pipeline {
 
     post {
         always {
-            emailext attachLog: true,
-                subject: "'${currentBuild.result}'",
-                body: "Project: ${env.JOB_NAME}<br/>" +
-                      "Build Number: ${env.BUILD_NUMBER}<br/>" +
-                      "URL: ${env.BUILD_URL}<br/>",
+            emailext(
+                attachLog: true,
+                subject: "Build ${currentBuild.currentResult}: ${env.JOB_NAME}",
+                body: """
+                Project: ${env.JOB_NAME}
+                Build Number: ${env.BUILD_NUMBER}
+                Build URL: ${env.BUILD_URL}
+                """,
                 to: 'gannisriramya26@gmail.com',
-                attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
+                attachmentsPattern: 'trivyfs.txt,trivy-image-report.txt'
+            )
         }
     }
 }
