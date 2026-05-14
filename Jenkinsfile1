@@ -31,7 +31,7 @@ pipeline {
                     sh '''
                     $SCANNER_HOME/bin/sonar-scanner \
                     -Dsonar.projectName=BMS \
-                    -Dsonar.projectKey=BMS
+                    -Dsonar.projectKey=BMS \
                     -Dsonar.sources=bookmyshow-app \
                     -Dsonar.exclusions=**/node_modules/**
                     '''
