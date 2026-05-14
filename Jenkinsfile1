@@ -32,6 +32,8 @@ pipeline {
                     $SCANNER_HOME/bin/sonar-scanner \
                     -Dsonar.projectName=BMS \
                     -Dsonar.projectKey=BMS
+                    -Dsonar.sources=bookmyshow-app \
+                    -Dsonar.exclusions=**/node_modules/**
                     '''
                 }
             }
@@ -39,8 +41,14 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
+                steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'SonarQube'
+                    timeout(time: 3, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Pipeline aborted due to Quality Gate failure"
+                        }
+                    }
                 }
             }
         }
@@ -109,15 +117,7 @@ pipeline {
                 sh '''
                 docker stop bms || true
                 docker rm bms || true
-
-                docker run -d --restart=always \
-                --name bms \
-                -p 3000:3000 \
-                sriramyaganni/bookmyshow:latest
-
-                docker ps -a
-                sleep 5
-                docker logs bms
+                docker run -d --restart=always --name bms -p 3000:3000 sriramyaganni/bookmyshow:latest
                 '''
             }
         }
